@@ -1,0 +1,6 @@
+out_chemfast.xml -- result of statistics of checking initial configure
+pair A A, r_min = 0.533647, i = 1804, j= 1802
+pair A B, r_min = 0.532187, i = 1042, j= 1047
+pair B B, r_min = 0.532143, i = 955, j= 143
+Density report: average number density 0.592593 ; local maximum number density 1.82933
+bond A-B, r_min = 1.1172, i = 0, j= 1, r_max = 1.1172, i = 0, j= 1

@@ -1,3 +1,9 @@
+# Copyright (c) 2024 Rui Shi, Mingyang Li, Hujun Qian
+# Licensed under the PolyForm Noncommercial License v1.0.0
+#  https://polyformproject.org/licenses/noncommercial/1.0.0/
+# Commercial Licensing
+#  For commercial use or to enter into a commercial license agreement, please contact: lmy23@mails.jlu.edu.cn
+
 from collections import namedtuple
 
 from rdkit.Chem import rdChemReactions
@@ -98,3 +104,4 @@ def bond_map(reactants: list, products: list, reaction: rdChemReactions.Chemical
                     if r_bond.GetBondType() != t:
                         res.append(bond_info(ip, (a, b), (a_rid, b_rid), (a_raid, b_raid), t, 'changed'))
     return res
+

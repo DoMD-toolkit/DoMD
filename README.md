@@ -37,6 +37,7 @@ DoMD is a toolkit for atomistic molecular dynamics modelling.
 * domd_database/forcefield/oplsaa/data/ligpargen/new_dataset.pkl
 * domd_database/forcefield/oplsaa/data/ligpargen/test_PI_experiment.pkl
 * domd_forcefield/oplsaa/resources/opls.db
+  ** this file is necessary for force-field parameterization **
 
 These large files can be found at [Google Drive](https://drive.google.com/file/d/1v5KtaHN5sy_GFXBt6ytWMiLTQ05qvYdg/view?usp=drive_link)
 

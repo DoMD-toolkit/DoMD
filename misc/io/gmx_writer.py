@@ -12,7 +12,7 @@ def write_gro_opls(system: nx.Graph, xyz: np.ndarray, forcefields, mols_graphs, 
         context = ''
         context += 'System\n'
         n_atoms = len(system.nodes)
-        context += '  {n_atoms:d}\n'
+        context += f'  {n_atoms:d}\n'
         for n in system.nodes:
             pos = xyz[n] / 10
             vel = np.zeros_like(pos)

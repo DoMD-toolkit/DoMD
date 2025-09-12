@@ -62,5 +62,5 @@ $ python polyimides.py
 * domd_database/forcefield/oplsaa/data/ligpargen/test_PI_experiment.pkl
 * domd_forcefield/oplsaa/resources/opls.db **This file is required for force field parameterization**
 
-These large files can be found at [Google Drive](https://drive.google.com/file/d/1v5KtaHN5sy_GFXBt6ytWMiLTQ05qvYdg/view?usp=drive_link)
+These large files can be found at [Google Drive](https://drive.google.com/file/d/1LOZXGej4wpHQfOhcjkZmLwiimPE0NFXF/view)
 

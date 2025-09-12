@@ -56,19 +56,29 @@ NBModel.to(device)
 NBModel.eval()
 
 idx_nonbond = pickle.load(open(os.path.join(this_dir, 'resources', 'idx_nonbond.pkl'), 'rb'))
-
+nb_an = pickle.load(open(os.path.join(this_dir, 'resources', 'nbtype_an_hash.pkl'), 'rb'))
 
 def mlnonbond(mol_graph):
     data = mol_graph
     with torch.no_grad():
         crossE, _ = NBModel(data.x_f.float(), data.edge_index, data.bo.float(), 1)
-    classB = [np.argmax(t) for t in crossE.detach().numpy()]
+    an = data.x_f[:, 1].numpy()
+    classB = []#[np.argmax(np.array([t[i] for i in range(len(t)) if nb_an[idx_nonbond[i]] == an[j]])) for j,t in enumerate(crossE.detach().numpy())]
+    for j,t in enumerate(crossE.detach().numpy()):
+        candidates = []
+        for i in range(len(t)):
+            if nb_an[idx_nonbond[i]] == an[j]:
+                candidates.append((np.exp(t[i])))
+            else:
+                candidates.append(0)
+        classB.append(np.argmax(np.array(candidates)))
     nonbondpara_ = [idx_nonbond[i] for i in classB]
     nonbondpara = {}
     for i, p in enumerate(nonbondpara_):
         nonbondpara[i] = p
     return nonbondpara
 
+#raise
 
 ## End of nonbond
 
@@ -118,9 +128,12 @@ CHModel.to(device)
 def mlcharge(mol_graph):
     data = mol_graph
     shift = 10
+    fcharge = (data.x_f[:, 4]/5).ravel().detach().cpu().numpy().sum()
     with torch.no_grad():
         output, fv = CHModel(data.x_f.float(), data.edge_index, data.bo.float(), shift)
         o = (output.reshape(-1, ) / shift).detach().cpu().numpy()
+    #o -= (o.sum()-fcharge) / len(o)
+    #print(fcharge.sum(), o.sum())
     charge = {}
     for i, c in enumerate(o):
         charge[i] = c
@@ -326,7 +339,9 @@ DihedralModel.eval()
 idx_di = pickle.load(open(os.path.join(this_dir, 'resources', 'idx_di.pkl'), 'rb'))
 di_idx = pickle.load(open(os.path.join(this_dir, 'resources', 'di_idx.pkl'), 'rb'))
 
+## End of dihedral
 
+## Improper
 def mldihedral(angle_graph):
     data = angle_graph
     crossE = DihedralModel(data.a_f.float(), data.edge_index, data.do.float(), 1)
@@ -351,3 +366,59 @@ def mldihedral(angle_graph):
         dipara[(ni, i, j, nj)] = (f'Dih_{di_idx[dp]:0>3d}_ML', dp[0], dp[1], dp[2], dp[3], dp[4], dp[5])  # dp
         # dipara[(nj,j,i,ni)] = dp
     return dipara
+
+class GATImp(nn.Module):
+    def __init__(self, in_features, hidden_size, out_features, heads, flag=0):
+        super(GATImp, self).__init__()
+        if flag == 0:
+            self.acti = nn.LeakyReLU()
+        elif flag == 1:
+            self.acti = nn.Softmax()
+        elif flag == 2:
+            self.acti = nn.ReLU()
+        self.l1 = nn.Linear(in_features, hidden_size, bias=False)
+        self.gat1 = GATConv(in_features, hidden_size , edge_dim=2, heads=1, dropout=0.01)
+        self.gat2 = GATConv(hidden_size, hidden_size , edge_dim=2, heads=1, dropout=0.01)
+        self.gat3 = GATConv(hidden_size, hidden_size , edge_dim=2, heads=1, dropout=0.01)
+
+        self.l2 = nn.Linear(hidden_size, hidden_size)
+        self.l3 = nn.Linear(hidden_size, hidden_size)
+        self.layers1 = nn.ModuleList()
+        for _ in range(2):
+            self.layers1.append(nn.Linear(hidden_size, hidden_size))
+        self.l4 = nn.Linear(hidden_size, hidden_size)
+        self.lf = nn.Linear(hidden_size, out_features)
+        self.dp = nn.Dropout(p=0.3)
+
+    def forward(self,x,edge_index,edge_attr,shift):
+        y0 = F.relu(self.gat1(x,edge_index,edge_attr=edge_attr))
+        y1 = F.relu(self.gat2(y0,edge_index, edge_attr=edge_attr))
+        y2 = F.relu(self.gat3(y1+y0,edge_index, edge_attr=edge_attr))
+        y3 = F.relu(self.l2(y0+y1+y2))
+        yb = self.lf(y3)
+        return yb
+
+
+in_features ,out_features, hidden_size, heads = 10, 3, 128, 1
+flag = 2
+
+ImproperModel = GATImp(in_features, hidden_size, out_features, heads, flag)
+model_p = torch.load(os.path.join(this_dir, 'resources', 'minImp.pt'), map_location="cpu", weights_only=True)
+ImproperModel.load_state_dict(model_p)
+ImproperModel.to(device)
+ImproperModel.eval()
+
+idx_imp = pickle.load(open(os.path.join(this_dir, 'resources', 'idx_imps.pkl'), 'rb'))
+imp_idx = pickle.load(open(os.path.join(this_dir, 'resources', 'imps_idx.pkl'), 'rb'))
+
+
+def mlimproper(mol_graph):
+    data = mol_graph
+    crossE = ImproperModel(data.x_f.float(), data.edge_index, data.bo.float(), 1)
+    classB = [np.argmax(t) for t in crossE.detach().numpy()]
+    impropara_ = [idx_imp[i] for i in classB]
+    impropara = {}
+    for i, p in enumerate(impropara_):
+        impropara[i] = (f'Impr_{imp_idx[p]:0>3d}_ML', p[0], p[1], p[2])
+    return impropara
+## End of improper

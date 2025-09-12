@@ -97,7 +97,7 @@ def write_gro_opls(system: nx.Graph, xyz: np.ndarray, forcefields, mols_graphs, 
         imp = forcefields['impropers'][i,j,k,l]
         ftype = imp.ftype
         params = imp.param[1:-1].split(',')
-        context += f"{i + 1:>8d} {j + 1:>8d} {k + 1:>8d} {l + 1:>8d}  {ftype:>2d}    {params[0]:>12s} {params[1]:>12s}\n"
+        context += f"{i + 1:>8d} {j + 1:>8d} {k + 1:>8d} {l + 1:>8d}  {ftype:>2d}    {params[0]:>12s} {params[1]:>12s} {params[2]:>12s}\n"
 
     context += '[ pairs ]\n'
     for i,j,k,l in forcefields['dihedrals']:

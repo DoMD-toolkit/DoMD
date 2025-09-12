@@ -1,5 +1,3 @@
-import sys
-#sys.path.append('e:\\downloads\\article\\high_throughput_system\\software\\DoMD\\')
 import collections
 import re
 import shutil
@@ -93,15 +91,18 @@ def custom_angle(custom_rules: list[CustomRule], molecule: Union[Chem.Mol, Chem.
 
 
 def custom_improper(custom_rules: list[CustomRule], molecule: Union[Chem.Mol, Chem.RWMol],
-                    query: tuple[int, int, int], j: int) -> tuple[Any, Any]:
+                    query: int, perm: tuple[int,int,int]) -> tuple[Any, Any]:
     _opls_improper, _perm = None, None
+    j = query
     for _i, rule in enumerate(custom_rules):
-        _opls_improper, _perm = rule(molecule, query)
-        i, k, l = _perm
-        if j != _perm[1]:
-            logger.error(f"The custom improper rule {rule.name} "
-                         f"is possibly incorrect, the center atom {j} should always "
-                         f"be second in permutation {_perm}!")
+        #_opls_improper, _perm = rule(molecule, query)
+        _opls_improper = rule(molecule, (j,'imp'))
+        i, k, l = perm
+        #if j != _perm[1]:
+        #    logger.error(f"The custom improper rule {rule.name} "
+        #                 f"is possibly incorrect, the center atom {j} should always "
+        #                 f"be second in permutation {_perm}!")
+        _perm = (perm[0], j, perm[1], perm[2])
         if _opls_improper:
             _opls_improper.idx = _perm
             logger.debug(f"This is custom improper finder {rule.name}, "
@@ -175,7 +176,7 @@ class OplsFF(ForceField):
 
     def parameterize(self, molecule: Union[Chem.Mol, Chem.RWMol],
                      use_cache: bool = True, boss_radius: Union[None, int] = 3,
-                     use_cache_in_custom: bool = False):
+                     use_cache_in_custom: bool = False, custom_rules: str = 'bonded'):
         r"""
         The prediction sequence is custom (ML) -> gmx (overwrite if use) -> boss (overwrite if use).
         Or Only ML can be applied.
@@ -187,11 +188,32 @@ class OplsFF(ForceField):
         env_hashes: dict[int, str] = {}
         atom_infos = {}
 
+        _skip_gmx_atom = False
+        _skip_boss_atom = False
+        _skip_gmx_bonded = False
+        _skip_boss_bonded = False
+
+        if custom_rules == 'bonded':
+            _skip_boss_bonded = True
+            _skip_gmx_bonded = True
+
+        if custom_rules == 'all':  # use this to skip all database/rule searches
+            _skip_gmx_atom = True
+            _skip_boss_atom = True
+            _skip_gmx_bonded = True
+            _skip_boss_bonded = True
+
         # build env hash
         logger.debug(f"Building atom environment hash.")
-        atom_meta: dict[int, list] = atom_stats(molecule, boss_radius)
-        for k in atom_meta:
-            env_hashes[k] = atom_meta[k][-1]
+        if molecule.GetNumAtoms() != 1:
+            atom_meta: dict[int, list] = atom_stats(molecule, boss_radius)
+            for k in atom_meta:
+                env_hashes[k] = atom_meta[k][-1]
+        else:  # single atom molecule
+            atom = molecule.GetAtomWithIdx(0)
+            env_hashes[0] = f"{atom.GetSymbol()}"
+            atom_meta = {}
+            atom_meta[atom.GetIdx()] = [atom.GetIdx(), atom.GetSymbol(), Chem.MolToSmiles(molecule), env_hashes[0]]
 
         # turn off gmx rules and boss if database not provided
         use_gmx = use_boss = True
@@ -267,7 +289,7 @@ class OplsFF(ForceField):
                     self.cache['atoms_cus'][env_hash] = _atom_type_cus
                     found_p = True
 
-            if use_gmx:
+            if use_gmx and (not _skip_gmx_atom):
                 ob_atom: ob.OBAtom = ob_mol.GetAtomById(atom.GetIdx())
                 _atom_type_gmx = gmx_typing(self.gmx_rules, ob_atom=ob_atom, atom_info=atom_info_str)
                 if _atom_type_gmx is not None:
@@ -277,7 +299,7 @@ class OplsFF(ForceField):
                     self.cache['atoms_gmx'][env_hash] = _atom_type_gmx
                     found_p = True
 
-            if use_boss:  # not found by gmx
+            if use_boss and (not _skip_boss_atom):  # not found by gmx
                 _opls_atom_boss = self.db.search(target='atom_boss', hash=env_hash)
                 if _opls_atom_boss:
                     logger.debug(f"This is OPLS-aa type finder, atom "
@@ -335,9 +357,9 @@ class OplsFF(ForceField):
                 if self.atoms[_atom.GetIdx()].name.endswith('_ML'):
                     # make sure you custom atom-typing rules either give sound opls-bond-type, or
                     # add a mark to skip the matching proc.
-                    logger.error(f"{_atom.GetIdx()}, {_atom.GetSymbol()} not found bond_type for gmx or boss!")
+                    logger.warning(f"{_atom.GetIdx()}, {_atom.GetSymbol()} not found bond_type for gmx or boss, but use ML prediction.")
                     _skip_bond = True
-
+            _skip_bond = _skip_gmx_bonded and _skip_boss_bonded
             if (use_gmx or use_boss) and (not _skip_bond):
                 # make a record when there is gmx/boss non-typed opls_atom
                 # for a bonded gmx/boss parameters
@@ -345,12 +367,12 @@ class OplsFF(ForceField):
                 # atoms, this should not be a problem
                 _bond_gmx = _bond_boss = None
                 # search gmx rules first, if boss, overwrite it.
-                if use_gmx:
+                if use_gmx and (not _skip_gmx_bonded):
                     _bond_gmx = self.db.search("bonded_gmx", name=name1, stype='bond') or \
                                 self.db.search("bonded_gmx", name=name2, stype='bond')
                     if _bond_gmx:
                         logger.debug(f"GMX bond found for {(bi, bj)}, {name1}, {_bond_gmx}")
-                if use_boss:
+                if use_boss and (not _skip_boss_bonded):
                     bond_type_1 = self.atoms[bi].bond_type
                     bond_type_2 = self.atoms[bj].bond_type
                     name1 = "-".join([bond_type_1, bond_type_2])
@@ -405,7 +427,7 @@ class OplsFF(ForceField):
         # make each searching part independent
         # find torsions via iterating over bonds.
         missing_torsion = []
-        for bond in tqdm.tqdm(molecule.GetBonds(),total=len(molecule.GetBonds()),desc='searching torsions'):
+        for bond in tqdm.tqdm(molecule.GetBonds(), total=len(molecule.GetBonds()), desc='searching torsions'):
             bi = bond.GetBeginAtomIdx()
             bj = bond.GetEndAtomIdx()
             atom_i: Chem.Atom = bond.GetBeginAtom()
@@ -448,7 +470,7 @@ class OplsFF(ForceField):
                     # Starg finding...
                     # Custom first
                     if self.custom_dihedral is not None:
-                        #print(_perm)
+                        # print(_perm)
                         dih, perm = custom_torsion(self.custom_dihedral, molecule, _perm)
                         if dih is not None:
                             dih.idx = perm
@@ -457,13 +479,15 @@ class OplsFF(ForceField):
                     if _skip_torsion:
                         logger.info(f"{name1} contains invalid opls bond-types, skipping gmx or boss rule-searching.")
 
+                    _skip_torsion = _skip_gmx_bonded and _skip_boss_bonded
+
                     if (use_gmx or use_boss) and (not _skip_torsion):
                         # make a record when there is gmx/boss non-typed opls_atom
                         # for a bonded gmx/boss parameters
                         # however, since I have set '!bond_type' for gmx/boss non-typed
                         # atoms, this should not be a problem
 
-                        if use_boss:
+                        if use_boss and (not _skip_boss_bonded):
                             dih_boss = self.db.search('bonded_boss', hash=_dih_hash_str, stype='dihedral')
                             if dih_boss is not None:
                                 logger.debug(f"Found boss dihedral by hash {_dih_hash_str} with {_perm}: {dih_boss}")
@@ -472,12 +496,12 @@ class OplsFF(ForceField):
                         for _name, _perm in zip(_all_names, _all_perms):
                             dih_gmx = dih_boss = None
 
-                            if use_gmx:
+                            if use_gmx and (not _skip_gmx_bonded):
                                 dih_gmx = self.db.search("bonded_gmx", name=_name, stype='dihedral')
                                 if dih_gmx is not None:
                                     logger.debug(f"Found gmx dihedral {_name} with {_perm}: {dih_gmx}")
 
-                            if use_boss:
+                            if use_boss and (not _skip_boss_bonded):
                                 _name = re.sub(r'_\d+', '', _name)
                                 dih_boss = self.db.search('bonded_boss', name=_name, stype='dihedral')
                                 if dih_boss is not None:
@@ -500,7 +524,7 @@ class OplsFF(ForceField):
 
                     # if not found above, try hash last
                     # Even the gmx or boss rules are skipped, we can still use hash
-                    if use_boss and (dih is None):  # find by hash at last
+                    if use_boss and (dih is None) and (not _skip_torsion):  # find by hash at last
                         _hashes = [env_hashes[ni], env_hashes[bi], env_hashes[bj], env_hashes[nj]]
                         _hash = bonded_hash(_hashes)
                         _dih_from_hash = self.db.search('bonded_boss', hash=_hash, stype='dihedral')
@@ -528,7 +552,7 @@ class OplsFF(ForceField):
 
         # find angles
         missing_angle = []
-        for atom in tqdm.tqdm(molecule.GetAtoms(),total=len(molecule.GetAtoms()),desc='searching angles'):
+        for atom in tqdm.tqdm(molecule.GetAtoms(), total=len(molecule.GetAtoms()), desc='searching angles'):
             # any atom with >=2 bonds can be a center of an angle
             if len(atom.GetNeighbors()) >= 2:
                 i = atom.GetIdx()
@@ -557,6 +581,7 @@ class OplsFF(ForceField):
                             self.angle[orig_perm] = ang
 
                         _skip_angle = ("Opls_nfd" in name1) or ("_ML" in name1)
+                        _skip_angle = _skip_boss_bonded and _skip_gmx_bonded
                         if _skip_angle:
                             logger.debug(
                                 f"{_atom.GetIdx()}, {atom.GetSymbol()} not found bond_type for gmx or boss!")
@@ -568,10 +593,10 @@ class OplsFF(ForceField):
                             # atoms, this should not be a problem
                             for _name, _perm in zip([name1, name2], [perm1, perm2]):
                                 ang_gmx = ang_boss = None
-                                if use_gmx:
+                                if use_gmx and (not _skip_gmx_bonded):
                                     ang_gmx = self.db.search('bonded_gmx', name=_name, stype='angle')
 
-                                if use_boss:
+                                if use_boss and (not _skip_boss_bonded):
                                     _name = re.sub(r'_\d+', '', _name)
                                     ang_boss = self.db.search('bonded_boss', name=_name, stype='angle')
 
@@ -591,7 +616,7 @@ class OplsFF(ForceField):
                         #####
                         # End of gmx or boss searching
                         # Even the gmx or boss rules are skipped, we can still use hash
-                        if use_boss and (ang is None):  # same as torsion
+                        if use_boss and (ang is None) and (not _skip_angle):  # same as torsion
                             _hashes = [env_hashes[ni], env_hashes[i], env_hashes[nj]]
                             _hash = bonded_hash(_hashes)
                             ang_hash = self.db.search('bonded_boss', hash=_hash)
@@ -616,7 +641,7 @@ class OplsFF(ForceField):
 
         # make all fucking searching independently
         # to avoid the fucking continue problem
-        for atom in tqdm.tqdm(molecule.GetAtoms(),total=len(molecule.GetAtoms()),desc='searching impropers'):
+        for atom in tqdm.tqdm(molecule.GetAtoms(), total=len(molecule.GetAtoms()), desc='searching impropers'):
             # improper, for center atom is j in i-j-k-l
             # always 180 to keep planar between i-j-k and j-k-l
             # rules from gromacs and oplsaa.par of BOSS
@@ -632,21 +657,23 @@ class OplsFF(ForceField):
 
                 perms = list(permutations(atom.GetNeighbors()))
                 perm: tuple = perms[0]
+                perm_idx = tuple([_.GetIdx() for _ in perm])
                 j = atom.GetIdx()
                 name = "-".join(
                     [self.atoms[_atom.GetIdx()].name for _atom in [atom] + list(atom.GetNeighbors())])
-                _skip_improper = "Opls_nfd" in name #or "_ML" in name
+                _skip_improper = "Opls_nfd" in name  # or "_ML" in name
+                _skip_improper = _skip_gmx_bonded and _skip_boss_bonded
                 if _skip_improper:
                     logger.debug(f"{'-'.join([str(_atom.GetIdx()) for _atom in [atom] + list(atom.GetNeighbors())])} "
                                  f"with "
                                  f"name {name}"
                                  f" has invalid bond_type for gmx or boss!")
                 if self.custom_improper:
-                    _opls_improper, _perm = custom_improper(self.custom_improper, molecule, perm, atom.GetIdx())
+                    _opls_improper, _perm = custom_improper(self.custom_improper, molecule, atom.GetIdx(), perm_idx)
                     if _opls_improper is not None:
                         self.improper[_perm] = _opls_improper
 
-                if use_gmx or use_boss and (not _skip_improper):
+                if (use_gmx or use_boss) and (not _skip_improper):
                     # make a record when there is gmx/boss non-typed opls_atom
                     # for a bonded gmx/boss parameters
                     # however, since I have set 'bond_type_XXX' for gmx/boss non-typed
@@ -716,7 +743,7 @@ class OplsFF(ForceField):
                             break
 
                 # Even the gmx or boss rules are skipped, we can still use hash
-                if use_boss:
+                if use_boss and (not _skip_improper):
                     _hash = improper_hash(env_hashes[atom.GetIdx()])
                     _improper_hash = self.db.search('improper_boss', hash=_hash, stype='improper')
                     if _improper_hash:

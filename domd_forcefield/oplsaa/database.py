@@ -142,7 +142,7 @@ class OplsAtom(object):
 
     def __repr__(self):
         return f"OplsAtom(name={self.name}, bond_type={self.bond_type}, smarts={self.smarts}, " \
-               f"hash={self.hash}, epsilon={self.epsilon}, sigma={self.sigma}, charge={self.charge}, " \
+               f"hash={self.hash}, epsilon={self.epsilon:.8f}, sigma={self.sigma:.3f}, charge={self.charge:.8f}, " \
                f"ptype={self.ptype}, element={self.element}, atomic_num={self.atomic_num}, " \
                f"mass={self.mass})"
 

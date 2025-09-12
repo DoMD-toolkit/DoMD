@@ -213,8 +213,8 @@ def mol2torch_graph(molecule: Union[Chem.Mol, Chem.RWMol]) -> tuple[Data, Data, 
     for e in ang_g.edges:
         ni, i, j, nj = ang_g.edges[e]['idx']
         # WTF is this?
-        if (13072, 13073, 13065, 28224) == (ni, i, j, nj) or (13072, 13073, 13065, 28224) == (nj, j, i, ni):
-            print('fucking insane')
+        #if (13072, 13073, 13065, 28224) == (ni, i, j, nj) or (13072, 13073, 13065, 28224) == (nj, j, i, ni):
+        #    print('fucking insane')
         idx_di.add((ni, i, j, nj))
         idx_di.add((nj, j, i, ni))
     for b in molecule.GetBonds():
@@ -256,7 +256,7 @@ def mol2torch_graph(molecule: Union[Chem.Mol, Chem.RWMol]) -> tuple[Data, Data, 
 class OplsMlRule(CustomRule):
     def __init__(self, atom_model: callable, charge_model: callable,
                  bond_model: callable, angle_model: callable,
-                 dihedral_model: callable,
+                 dihedral_model: callable, improper_model:callable,
                  molecule: Union[Chem.Mol, Chem.RWMol, None] = None, name="ML4ALL"):
         r"""
         This is an example that the ML method can output all parameters at once.
@@ -274,6 +274,7 @@ class OplsMlRule(CustomRule):
         self.bond_model = bond_model
         self.angle_model = angle_model
         self.dihedral_model = dihedral_model
+        self.improper_model = improper_model
         self.molecule = molecule
         self.atoms = None
         self.bonds = None
@@ -300,14 +301,15 @@ class OplsMlRule(CustomRule):
         self.charge = self.charge_model(mol_graph)
         self.atoms = self.atom_model(mol_graph)
         self.bonds = self.bond_model(mol_graph, self.molecule)
-        print(self.bonds.keys())
+        #print(self.bonds.keys())
         self.angles = self.angle_model(bond_graph)
         self.dihedrals = self.dihedral_model(ang_graph)
+        self.impropers = self.improper_model(mol_graph)
         logger.info(f"ML parameters generated with {len(self.atoms)} atoms, {len(self.charge)} charges,"
                     f" {len(self.bonds)} bonds, {len(self.angles)} angles and {len(self.dihedrals)} dihedrals. "
                     f"The molecule contains {self.molecule.GetNumAtoms()} atoms, {self.molecule.GetNumBonds()} bonds")
 
-    def process(self, molecule: Union[Chem.Mol, Chem.RWMol], query: Union[int, tuple[int]]) -> Any:
+    def process(self, molecule: Union[Chem.Mol, Chem.RWMol], query: Union[int, tuple[int], tuple[int,str]]) -> Any:
         r"""
         :param molecule: The target molecule, should be as same as self.molecule.
         :param query: query (molecule, atom_idx) for atom, (idx, jdx) for bond, etc.
@@ -325,9 +327,26 @@ class OplsMlRule(CustomRule):
             _symbol = _rd_atom.GetSymbol()
             _mass = _rd_atom.GetMass()
             _atomic_num = _rd_atom.GetAtomicNum()
+            #print(_atom[0], _atom[1], _charge)
             return OplsAtom(name=f"{_symbol}_ML", bond_type=f"{_symbol}_ML", smarts=_symbol,
                             element=_symbol, hash=_symbol, charge=_charge, epsilon=_atom[0], sigma=_atom[1], ptype='A',
                             mass=_mass, atomic_num=_atomic_num, desc='ML model')
+        elif len(query) == 2 and query[1] == 'imp':  # for improper
+            query = query[0]
+            _imp = self.impropers[query]
+            #_atom = self.atoms[query]
+            #_charge = self.charge[query]
+            _rd_atom = self.molecule.GetAtomWithIdx(query)
+            _rd_atom1 = molecule.GetAtomWithIdx(query)
+            assert _rd_atom.GetAtomicNum() == _rd_atom1.GetAtomicNum(), ("The molecule used to initiate"
+                                                                         "ML and applied is not same!")
+            _symbol = _rd_atom.GetSymbol()
+            _mass = _rd_atom.GetMass()
+            _atomic_num = _rd_atom.GetAtomicNum()
+            #print(_atom[0], _atom[1], _charge)
+            name = f'{_symbol}-SP2-imp'
+            return OplsBonded(name=name, hash=name, ftype=4, param=f'[{_imp[1]}, {_imp[2]}, {_imp[3]}]',
+                              type='bond', idx=None, is_rule=False)
         elif len(query) == 2:  # for bonds
             i, j = query
             _rd_atom_i = molecule.GetAtomWithIdx(i)
@@ -378,16 +397,25 @@ class OplsMlRule(CustomRule):
                               type='dihedral', idx=(ni, i, j, nj), is_rule=False), query
 
 
-from domd_forcefield.oplsaa.ml_functions.models import mlnonbond, mlbond, mlangle, mlcharge, mldihedral
+from domd_forcefield.oplsaa.ml_functions.models import mlnonbond, mlbond, mlangle, mlcharge, mldihedral,mlimproper
 
-MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral)
+MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral,mlimproper)
 
 if __name__ == '__main__':
     from rdkit import Chem
-    MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral)
-    mol = Chem.MolFromSmiles('CCC(F)(F)F')
-    print(MLModel(mol, 2))
-    print(MLModel(mol, (2, 3)))
-    MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral)
-    mol = Chem.MolFromSmiles('CCOCOCC(F)(F)F')
-    print(MLModel(mol, (2, 3)))
+    MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral,mlimproper)
+    mol = Chem.MolFromSmiles('C(F)(F)(F)S(=O)(=O)[N-]S(=O)(=O)C(F)(F)F')
+    #mol = Chem.MolFromSmiles('[Li+]')
+    mol = Chem.AddHs(mol)
+    c = []
+    n_atom = mol.GetNumAtoms()
+    for a in mol.GetAtoms():
+        print(MLModel(mol, a.GetIdx()), a.GetFormalCharge(), a.GetSymbol(), a.GetIdx())
+        c.append(MLModel(mol, a.GetIdx()).charge)
+    c = np.array(c)
+    print(sum(c))
+    #print(c - (sum(c)+1)/n_atom)
+    #print(MLModel(mol, (2, 3)))
+    #MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral)
+    #mol = Chem.MolFromSmiles('CCOCOCC(F)(F)F')
+    #print(MLModel(mol, (2, 3)))

@@ -1,5 +1,5 @@
 import sys
-#sys.path.append('/home1/lmy/DoMD')
+sys.path.append('<path-to-DoMD>')
 from domd_cgbuilder._conf_gen import embed_CG_system
 from domd_cgbuilder.cg_mol import CGMol
 from misc.cg_system import read_cg_topology
@@ -118,28 +118,32 @@ from domd_xyz.embed_molecule import embed_molecule
 confs = []
 for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
     conf = embed_molecule(aa_mol, cg_mol, box = box)
-    #Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
+    Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
     confs.append(conf)
+    #break
 
 # force field parameterization
 
 from domd_forcefield.oplsaa.opls import OplsFF
 from domd_forcefield.oplsaa.opls_db import opls_db
 from domd_forcefield.oplsaa.ml import OplsMlRule
-from domd_forcefield.oplsaa.ml_functions.models import mlnonbond, mlbond, mlangle, mlcharge, mldihedral
+from domd_forcefield.oplsaa.ml_functions.models import mlnonbond, mlbond, mlangle, mlcharge, mldihedral,mlimproper
 
 gmx_rules = opls_db.rules
 ffs = []
 
 for aa_mol in aa_mols_h[:]:
-    MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral)
-
+    MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral,mlimproper)
     ff = OplsFF(database=opls_db,gmx_rules=gmx_rules,custom_typing=[MLModel], custom_angles=[MLModel],
-                       custom_dihedrals=[MLModel], custom_bonding=[MLModel])
-    ff.parameterize(aa_mol)
+                       custom_dihedrals=[MLModel], custom_bonding=[MLModel], custom_impropers=[MLModel])
+    #ff.parameterize(aa_mol)
+    #ff.stats()
+    #ff = OplsFF(database=opls_db,gmx_rules=gmx_rules)
+    ff.parameterize(aa_mol,custom_rules='all')
+    ff.stats()
     ffs.append(ff)
-
-
+    #break
+#raise
 from misc.io.assemble import assemble_opls
 
 ret = assemble_opls(aa_mols_h,ffs,confs)
@@ -150,6 +154,6 @@ from misc.io.xml_writer import write_xml_opls
 write_xml_opls(aa_system, xyz, all_forcefields, box=list(box)+[0,0,0])
 
 from misc.io.gmx_writer import write_gro_opls
-write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=list(box)+[0,0,0],ext='pdb')
+write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=list(box)+[0,0,0],ext='gro')
 
 print("total time:", round(time.time()-start,3), 'seconds')

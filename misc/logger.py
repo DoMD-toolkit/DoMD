@@ -36,4 +36,4 @@ class DuplicateFilter:
 # Example usage:
 logger = get_logger(__name__)
 logger.setLevel('INFO')
-#logger.setLevel('WARNING')
+#logger.setLevel('ERROR')

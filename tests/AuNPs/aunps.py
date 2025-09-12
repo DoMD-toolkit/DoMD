@@ -1,5 +1,4 @@
 import sys
-sys.path.append('<path-to-DoMD>')
 from domd_cgbuilder._conf_gen import embed_CG_system
 from domd_cgbuilder.cg_mol import CGMol
 from misc.cg_system import read_cg_topology
@@ -341,21 +340,21 @@ aa_mols_h = [Chem.AddHs(m) for m in aa_mols]
 #    # map guarantees that results[i] is worker(i)
 #    confs = pool.map(proc, range(len(aa_mols_h)))
 
-confs = []
-for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
-    if aa_mol.GetNumAtoms() > 10000:
-        chunk_per_d=4
-    else:
-        chunk_per_d=1
-    conf = embed_molecule(aa_mol, cg_mol, box = box, chunk_per_d=chunk_per_d)
-    #Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
-    confs.append(conf)
+#confs = []
+#for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
+#    if aa_mol.GetNumAtoms() > 10000:
+#        chunk_per_d=4
+#    else:
+#        chunk_per_d=1
+#    conf = embed_molecule(aa_mol, cg_mol, box = box, chunk_per_d=chunk_per_d)
+#    #Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
+#    confs.append(conf)
 
 gmx_rules = opls_db.rules
 ffs = []
 
 for aa_mol in aa_mols_h[:]:
-    if aa_mol.GetNumAtoms() < 4:
+    if aa_mol.GetNumAtoms() < 2:
         ff = OplsFF(database=opls_db,gmx_rules=gmx_rules)
         ff.parameterize(aa_mol)
         ffs.append(ff)
@@ -369,7 +368,7 @@ for aa_mol in aa_mols_h[:]:
     #for i in ff.atoms.atoms:
     #    print(i, ff.atoms.atoms[i])
     #break
-print("total time:", round(time.time()-start,3), 'seconds')
+#print("total time:", round(time.time()-start,3), 'seconds')
 #raise
 ret = assemble_opls(aa_mols_h,ffs,confs)
 

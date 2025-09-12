@@ -737,3 +737,4 @@ F   |  F        |   opls_965   |  [$([F][CH0]([F])([F])[F])] | @atom:795 |   -0.
 *Fe  |  Fe2+     |   Fe2+       |  [Fe+2]
 *Si  |  SI       |   SI         |  [Si]
 nom | nom | opls_no | no | @atom:nnn | 0.0 | no
+Au | Au        |  opls_998 | [Au] | @atom:998 | 0.0 | "Au"

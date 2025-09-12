@@ -28,6 +28,16 @@
 # DoMD
 DoMD is a toolkit for atomistic molecular dynamics modelling.
 
+# Install
+
+conda create -n domd-toolkit -c conda-forge numpy rdkit openbabel numba networkx pandas scipy jupyter scikit-learn matplotlib python==3.12
+
+conda activate domd-toolkit
+
+pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+pip install torch_geometric pdbreader
+
 # Large files
 * domd_database/forcefield/oplsaa/data/ligpargen/AllData.pkl
 * domd_database/forcefield/oplsaa/data/ligpargen/AllData_addition.pkl

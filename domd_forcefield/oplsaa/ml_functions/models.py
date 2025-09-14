@@ -62,20 +62,29 @@ def mlnonbond(mol_graph):
     data = mol_graph
     with torch.no_grad():
         crossE, _ = NBModel(data.x_f.float(), data.edge_index, data.bo.float(), 1)
-    an = data.x_f[:, 1].numpy()
+    an = data.x_f[:, 1].numpy().ravel()
     classB = []#[np.argmax(np.array([t[i] for i in range(len(t)) if nb_an[idx_nonbond[i]] == an[j]])) for j,t in enumerate(crossE.detach().numpy())]
+    #print(crossE.shape)
     for j,t in enumerate(crossE.detach().numpy()):
         candidates = []
         for i in range(len(t)):
             if nb_an[idx_nonbond[i]] == an[j]:
-                candidates.append((np.exp(t[i])))
+                candidates.append((np.exp(t[i])+1))
             else:
                 candidates.append(0)
+        #print(candidates)
         classB.append(np.argmax(np.array(candidates)))
+    #print(classB)
     nonbondpara_ = [idx_nonbond[i] for i in classB]
     nonbondpara = {}
+    orgi_idx = data.orig_idx.numpy()
     for i, p in enumerate(nonbondpara_):
-        nonbondpara[i] = p
+        nonbondpara[orgi_idx[i]] = p
+    #for i in nonbondpara:
+    #    p = nonbondpara[i]
+    #    if nb_an[p] != an[i]:
+    #        print('Error in nonbond assignment!')
+    #        raise
     return nonbondpara
 
 #raise

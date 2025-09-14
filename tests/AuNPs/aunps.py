@@ -340,15 +340,15 @@ aa_mols_h = [Chem.AddHs(m) for m in aa_mols]
 #    # map guarantees that results[i] is worker(i)
 #    confs = pool.map(proc, range(len(aa_mols_h)))
 
-#confs = []
-#for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
-#    if aa_mol.GetNumAtoms() > 10000:
-#        chunk_per_d=4
-#    else:
-#        chunk_per_d=1
-#    conf = embed_molecule(aa_mol, cg_mol, box = box, chunk_per_d=chunk_per_d)
-#    #Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
-#    confs.append(conf)
+confs = []
+for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
+    if aa_mol.GetNumAtoms() > 10000:
+        chunk_per_d=4
+    else:
+        chunk_per_d=1
+    conf = embed_molecule(aa_mol, cg_mol, box = box, chunk_per_d=chunk_per_d)
+    #Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
+    confs.append(conf)
 
 gmx_rules = opls_db.rules
 ffs = []
@@ -364,15 +364,11 @@ for aa_mol in aa_mols_h[:]:
                     custom_dihedrals=[MLModel], custom_bonding=[MLModel], custom_impropers=[MLModel])
         ff.parameterize(aa_mol,custom_rules='all')
         ffs.append(ff)
-    #ff.stats()
-    #for i in ff.atoms.atoms:
-    #    print(i, ff.atoms.atoms[i])
-    #break
-#print("total time:", round(time.time()-start,3), 'seconds')
-#raise
+
 ret = assemble_opls(aa_mols_h,ffs,confs)
 
 aa_system, xyz, all_forcefields, mols_graphs = ret
 
-write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=list(box)+[0,0,0],ext='pdb')
+write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=list(box)+[0,0,0],ext='gro')
 print("total time:", round(time.time()-start,3), 'seconds')
+## total time: 6322.657 seconds

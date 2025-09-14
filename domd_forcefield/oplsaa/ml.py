@@ -337,13 +337,6 @@ class OplsMlRule(CustomRule):
             _symbol = _rd_atom.GetSymbol()
             _mass = _rd_atom.GetMass()
             _atomic_num = _rd_atom.GetAtomicNum()
-            #print(_atom[0], _atom[1], _charge)
-            an_ = nb_an[_atom]
-            #if an_ != _atomic_num:
-            #    logger.warning(f"In custom finder {self.name}, atom {query} with {_symbol} assigned atomic number {an_} "
-            #                   f"not equal to rdkit atomic number {_atomic_num}. Use rdkit atomic number.")
-                #an_ = _atomic_num
-            #    raise
             return OplsAtom(name=f"{_symbol}_ML", bond_type=f"{_symbol}_ML", smarts=_symbol,
                             element=_symbol, hash=_symbol, charge=_charge, epsilon=_atom[0], sigma=_atom[1], ptype='A',
                             mass=_mass, atomic_num=_atomic_num, desc='ML model')

@@ -23,21 +23,6 @@ from misc.io.assemble import assemble_opls
 from misc.io.xml_writer import write_xml_opls
 from misc.io.gmx_writer import write_gro_opls
 
-# TFSI
-MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral,mlimproper)
-mol = Chem.MolFromSmiles('C(F)(F)(F)S(=O)(=O)[N-]S(=O)(=O)C(F)(F)F')
-ff = OplsFF(database=opls_db,custom_typing=[MLModel], custom_angles=[MLModel],custom_bonding=[MLModel],custom_dihedrals=[MLModel],custom_impropers=[MLModel])
-ff.parameterize(mol)
-
-#import pickle
-#aa_system, xyz, all_forcefields, mols_graphs = pickle.load(open('spe_small_meta.pkl','rb'))
-#write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=[20,20,20,0,0,0],ext='pdb', prefix='test')
-#raise
-#ff.stats()
-#for a in ff.atoms.atoms:
-#    atom = ff.atoms.atoms[a]
-#    print(atom)
-#raise
 start = time.time()
 
 A0 = 'C1(=O)N(F)C(=O)N(F)C(=O)N1F'
@@ -209,4 +194,5 @@ import pickle
 pickle.dump((aa_system, xyz, all_forcefields, mols_graphs), open('spe_small_meta.pkl','wb'))
 write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=list(box)+[0,0,0],ext='pdb')
 print("total time:", round(time.time()-start,3), 'seconds')
+
 ## total time: 2094.721 seconds

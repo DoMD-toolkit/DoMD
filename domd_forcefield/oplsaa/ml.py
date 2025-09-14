@@ -326,8 +326,6 @@ class OplsMlRule(CustomRule):
         """
         if self.molecule is None:
             self.set_molecule(molecule)
-        import pickle
-        nb_an = pickle.load(open('E:\\downloads\\article\\high_throughput_system\\software\\DoMD-main\\domd_forcefield\\oplsaa\\ml_functions\\resources\\nbtype_an_hash.pkl','rb'))
         if isinstance(query, int):
             _atom = self.atoms[query]
             #print(_atom[0], _atom[1], _atom)

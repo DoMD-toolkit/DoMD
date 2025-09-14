@@ -1,5 +1,4 @@
 import sys
-sys.path.append('<path-to-DoMD>')
 from domd_cgbuilder._conf_gen import embed_CG_system
 from domd_cgbuilder.cg_mol import CGMol
 from misc.cg_system import read_cg_topology
@@ -24,6 +23,21 @@ from misc.io.assemble import assemble_opls
 from misc.io.xml_writer import write_xml_opls
 from misc.io.gmx_writer import write_gro_opls
 
+# TFSI
+MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral,mlimproper)
+mol = Chem.MolFromSmiles('C(F)(F)(F)S(=O)(=O)[N-]S(=O)(=O)C(F)(F)F')
+ff = OplsFF(database=opls_db,custom_typing=[MLModel], custom_angles=[MLModel],custom_bonding=[MLModel],custom_dihedrals=[MLModel],custom_impropers=[MLModel])
+ff.parameterize(mol)
+
+#import pickle
+#aa_system, xyz, all_forcefields, mols_graphs = pickle.load(open('spe_small_meta.pkl','rb'))
+#write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=[20,20,20,0,0,0],ext='pdb', prefix='test')
+#raise
+#ff.stats()
+#for a in ff.atoms.atoms:
+#    atom = ff.atoms.atoms[a]
+#    print(atom)
+#raise
 start = time.time()
 
 A0 = 'C1(=O)N(F)C(=O)N(F)C(=O)N1F'
@@ -153,6 +167,27 @@ aa_mols, meta = reactor.process(cg_mols, reactions)
 aa_mols_h = [Chem.AddHs(m) for m in aa_mols]
 [set_molecule_id_for_h(m) for m in aa_mols_h]
 
+gmx_rules = opls_db.rules
+ffs = []
+
+for aa_mol in aa_mols_h[:]:
+    if aa_mol.GetNumAtoms() < 2:
+        ff = OplsFF(database=opls_db,gmx_rules=gmx_rules)
+        ff.parameterize(aa_mol)
+        ffs.append(ff)
+    elif aa_mol.GetNumAtoms() < 20:
+        MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral,mlimproper)
+        ff = OplsFF(database=opls_db,custom_typing=[MLModel], custom_angles=[MLModel],
+                       custom_dihedrals=[MLModel], custom_bonding=[MLModel], custom_impropers=[MLModel])
+        ff.parameterize(aa_mol)
+        ffs.append(ff)
+    else:
+        MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral, mlimproper)
+        ff = OplsFF(custom_typing=[MLModel], custom_angles=[MLModel],
+                       custom_dihedrals=[MLModel], custom_bonding=[MLModel], custom_impropers=[MLModel])
+        ff.parameterize(aa_mol,custom_rules='all')
+        ffs.append(ff)
+
 confs = []
 for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
     if aa_mol.GetNumAtoms() > 10000:
@@ -163,25 +198,15 @@ for i,aa_mol, cg_mol in zip(range(len(aa_mols_h[:])),aa_mols_h[:],cg_mols[:]):
     #Chem.MolToPDBFile(aa_mol, f"out_{i:0>3d}.pdb", flavor=4)
     confs.append(conf)
 
-gmx_rules = opls_db.rules
-ffs = []
 
-for aa_mol in aa_mols_h[:]:
-    if aa_mol.GetNumAtoms() < 20:
-        ff = OplsFF(database=opls_db,gmx_rules=gmx_rules)
-        ff.parameterize(aa_mol)
-        ffs.append(ff)
-    else:
-        MLModel = OplsMlRule(mlnonbond, mlcharge, mlbond, mlangle, mldihedral, mlimproper)
-        ff = OplsFF(custom_typing=[MLModel], custom_angles=[MLModel],
-                       custom_dihedrals=[MLModel], custom_bonding=[MLModel], custom_impropers=[MLModel])
-        ff.parameterize(aa_mol,custom_rules='all')
-        ffs.append(ff)
 #print("total time:", round(time.time()-start,3), 'seconds')
 #raise
 ret = assemble_opls(aa_mols_h,ffs,confs)
 
 aa_system, xyz, all_forcefields, mols_graphs = ret
-
+import pickle
+#pickle.dump(ffs, open('spe_small_ffs.pkl','wb'))
+pickle.dump((aa_system, xyz, all_forcefields, mols_graphs), open('spe_small_meta.pkl','wb'))
 write_gro_opls(aa_system, xyz, all_forcefields, mols_graphs,box=list(box)+[0,0,0],ext='pdb')
 print("total time:", round(time.time()-start,3), 'seconds')
+## total time: 2094.721 seconds

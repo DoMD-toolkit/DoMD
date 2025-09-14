@@ -112,13 +112,13 @@ def mol2torch_graph(molecule: Union[Chem.Mol, Chem.RWMol]) -> tuple[Data, Data, 
             xf = np.array([100 * gei, ai.GetAtomicNum(), int(ai.GetIsAromatic()) * 10, int(ai.IsInRing()) * 10,
                            ai.GetFormalCharge() * 5, 2 * hi.real + hi.imag, ai.GetExplicitValence() * 5,
                            getneimasssum(ai), eni * 5, neni * 5], dtype=float)
-            g.add_node(ai.GetIdx(), x_f=xf)
+            g.add_node(ai.GetIdx(), x_f=xf, orig_idx=ai.GetIdx())
         if aj.GetIdx() not in nds:
             nds.add(aj.GetIdx())
             xf = np.array([100 * gej, aj.GetAtomicNum(), int(aj.GetIsAromatic()) * 10, int(aj.IsInRing()) * 10,
                            aj.GetFormalCharge() * 5, 2 * hj.real + hj.imag, aj.GetExplicitValence() * 5,
                            getneimasssum(aj), enj * 5, nenj * 5], dtype=float)
-            g.add_node(aj.GetIdx(), x_f=xf)
+            g.add_node(aj.GetIdx(), x_f=xf, orig_idx=aj.GetIdx())
         if not bond.GetBondTypeAsDouble():
             break_flag = 1
             continue
@@ -131,6 +131,16 @@ def mol2torch_graph(molecule: Union[Chem.Mol, Chem.RWMol]) -> tuple[Data, Data, 
             k, bl = cc
         g.add_edge(ai.GetIdx(), aj.GetIdx(), bo=torch.tensor(np.asarray([bond.GetBondTypeAsDouble(), bl]), dtype=float),
                    bidx=idx)
+    # evaluate
+    data_molg = from_networkx(g)
+    #for i in g.nodes:
+    #    an_ = data_molg.x_f[i][1]
+    #    if an_ != molecule.GetAtomWithIdx(i).GetAtomicNum():
+    #        logger.warning(f"In mol2torch_graph, atom {i} with {molecule.GetAtomWithIdx(i).GetSymbol()} assigned atomic number {an_} "
+    #                       f"not equal to rdkit atomic number {molecule.GetAtomWithIdx(i).GetAtomicNum()}. Use rdkit atomic number.")
+            #an_ = molecule.GetAtomWithIdx(i).GetAtomicNum()
+    #        raise
+
     aidx = 0
     didx = 0
     bond_g = nx.Graph()
@@ -247,7 +257,6 @@ def mol2torch_graph(molecule: Union[Chem.Mol, Chem.RWMol]) -> tuple[Data, Data, 
                     if (ni, i, nj) not in idx_an:
                         # print(ni, i, nj)
                         fuck_flag = True
-
     if fuck_flag:
         raise 'fuckkq'
     return from_networkx(g), from_networkx(bond_g), from_networkx(ang_g)
@@ -317,8 +326,11 @@ class OplsMlRule(CustomRule):
         """
         if self.molecule is None:
             self.set_molecule(molecule)
+        import pickle
+        nb_an = pickle.load(open('E:\\downloads\\article\\high_throughput_system\\software\\DoMD-main\\domd_forcefield\\oplsaa\\ml_functions\\resources\\nbtype_an_hash.pkl','rb'))
         if isinstance(query, int):
             _atom = self.atoms[query]
+            #print(_atom[0], _atom[1], _atom)
             _charge = self.charge[query]
             _rd_atom = self.molecule.GetAtomWithIdx(query)
             _rd_atom1 = molecule.GetAtomWithIdx(query)
@@ -328,6 +340,12 @@ class OplsMlRule(CustomRule):
             _mass = _rd_atom.GetMass()
             _atomic_num = _rd_atom.GetAtomicNum()
             #print(_atom[0], _atom[1], _charge)
+            an_ = nb_an[_atom]
+            #if an_ != _atomic_num:
+            #    logger.warning(f"In custom finder {self.name}, atom {query} with {_symbol} assigned atomic number {an_} "
+            #                   f"not equal to rdkit atomic number {_atomic_num}. Use rdkit atomic number.")
+                #an_ = _atomic_num
+            #    raise
             return OplsAtom(name=f"{_symbol}_ML", bond_type=f"{_symbol}_ML", smarts=_symbol,
                             element=_symbol, hash=_symbol, charge=_charge, epsilon=_atom[0], sigma=_atom[1], ptype='A',
                             mass=_mass, atomic_num=_atomic_num, desc='ML model')
@@ -410,7 +428,7 @@ if __name__ == '__main__':
     c = []
     n_atom = mol.GetNumAtoms()
     for a in mol.GetAtoms():
-        print(MLModel(mol, a.GetIdx()), a.GetFormalCharge(), a.GetSymbol(), a.GetIdx())
+        #print(MLModel(mol, a.GetIdx()), a.GetFormalCharge(), a.GetSymbol(), a.GetIdx())
         c.append(MLModel(mol, a.GetIdx()).charge)
     c = np.array(c)
     print(sum(c))

@@ -37,7 +37,8 @@ $ conda activate domd-toolkit
 $ pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 $ pip install torch_geometric pdbreader
 $ git clone https://github.com/DoMD-toolkit/DoMD.git
-# Download `opls.db' from the link below and move the according folder.
+# Download `opls.db' from the link below and move to the according folder:
+# e.g., <path-to-DoMD>/domd_forcefield/oplsaa/resources/opls.db
 ```
 ## Running Tests
 ```bash

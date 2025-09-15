@@ -110,13 +110,13 @@ def mol2torch_graph(molecule: Union[Chem.Mol, Chem.RWMol]) -> tuple[Data, Data, 
         if ai.GetIdx() not in nds:
             nds.add(ai.GetIdx())
             xf = np.array([100 * gei, ai.GetAtomicNum(), int(ai.GetIsAromatic()) * 10, int(ai.IsInRing()) * 10,
-                           ai.GetFormalCharge() * 5, 2 * hi.real + hi.imag, ai.GetExplicitValence() * 5,
+                           ai.GetFormalCharge() * 5, 2 * hi.real + hi.imag, ai.GetValence(Chem.ValenceType.EXPLICIT) * 5,
                            getneimasssum(ai), eni * 5, neni * 5], dtype=float)
             g.add_node(ai.GetIdx(), x_f=xf, orig_idx=ai.GetIdx())
         if aj.GetIdx() not in nds:
             nds.add(aj.GetIdx())
             xf = np.array([100 * gej, aj.GetAtomicNum(), int(aj.GetIsAromatic()) * 10, int(aj.IsInRing()) * 10,
-                           aj.GetFormalCharge() * 5, 2 * hj.real + hj.imag, aj.GetExplicitValence() * 5,
+                           aj.GetFormalCharge() * 5, 2 * hj.real + hj.imag, aj.GetValence(Chem.ValenceType.EXPLICIT) * 5,
                            getneimasssum(aj), enj * 5, nenj * 5], dtype=float)
             g.add_node(aj.GetIdx(), x_f=xf, orig_idx=aj.GetIdx())
         if not bond.GetBondTypeAsDouble():
